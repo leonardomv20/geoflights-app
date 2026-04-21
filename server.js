@@ -4,29 +4,27 @@ const cors = require('cors');
 
 const app = express();
 
-// Proteção do seu servidor
 const corsOptions = {
     origin: ['https://leonardomv20.github.io', 'http://localhost:3000'],
     optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
-// Custos logísticos do MVP (Mochileiro)
 const regionalCosts = {
     "GRU": { name: "Guarulhos", bus: 150, company: "Cometa" },
     "VCP": { name: "Viracopos", bus: 95, company: "VB Transportes" },
     "RAO": { name: "Ribeirão Preto", bus: 45, company: "Uber/Local" }
 };
 
-// FUNÇÃO DETETIVE (Agora com os parâmetros obrigatórios)
+// FUNÇÃO DETETIVE BLINDADA E EM INGLÊS
 async function getAirportDetails(iata, apiKey) {
     const options = {
         method: 'GET',
         url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchAirport',
         params: { 
             query: iata,
-            market: 'BR',    // Correção: Informando o mercado
-            locale: 'pt-BR'  // Correção: Informando o idioma
+            market: 'US',    // Voltamos para US para não bugar a API gratuita
+            locale: 'en-US'  // Voltamos para Inglês
         },
         headers: {
             'X-RapidAPI-Key': apiKey,
@@ -34,17 +32,25 @@ async function getAirportDetails(iata, apiKey) {
         }
     };
     
-    const response = await axios.request(options);
-    const data = response.data.data;
-    
-    if (!data || data.length === 0) {
-        throw new Error(`Skyscanner não reconheceu a sigla: ${iata}. Tente outra origem como GRU.`);
+    try {
+        const response = await axios.request(options);
+        const data = response.data.data;
+        
+        // Super Log para vermos o que a API está devolvendo de verdade
+        console.log(`Resposta do Detetive para ${iata}:`, JSON.stringify(data).substring(0, 150) + "...");
+        
+        if (!data || data.length === 0) {
+            throw new Error(`Skyscanner retornou vazio para a sigla: ${iata}`);
+        }
+        
+        return {
+            skyId: data[0].skyId || data[0].navigation?.relevantFlightParams?.skyId,
+            entityId: data[0].entityId || data[0].navigation?.relevantFlightParams?.entityId
+        };
+    } catch (err) {
+        console.error(`Erro ao traduzir o aeroporto ${iata}:`, err.message);
+        throw new Error(`Falha ao buscar código do aeroporto ${iata}`);
     }
-    
-    return {
-        skyId: data[0].skyId || data[0].navigation?.relevantFlightParams?.skyId,
-        entityId: data[0].entityId || data[0].navigation?.relevantFlightParams?.entityId
-    };
 }
 
 app.get('/api/buscar', async (req, res) => {
@@ -58,11 +64,11 @@ app.get('/api/buscar', async (req, res) => {
     try {
         console.log(`Buscando códigos secretos para ${origemId} e ${destinoId}...`);
         
-        // Passo 1: Pega os IDs numéricos
+        // Passo 1: Pega os IDs numéricos (agora pesquisando em US)
         const originInfo = await getAirportDetails(origemId, apiKey);
         const destInfo = await getAirportDetails(destinoId, apiKey);
 
-        // Passo 2: Busca os voos reais
+        // Passo 2: Busca os voos reais (Mantemos BRL para o preço vir em Reais)
         const options = {
             method: 'GET',
             url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
@@ -108,7 +114,7 @@ app.get('/api/buscar', async (req, res) => {
 
         res.json(processed);
     } catch (error) {
-        console.error("Erro no Servidor:", error.response?.data || error.message);
+        console.error("Erro Final no Servidor:", error.response?.data || error.message);
         res.status(500).json({ error: error.message || "Erro ao consultar a malha aérea." });
     }
 });
