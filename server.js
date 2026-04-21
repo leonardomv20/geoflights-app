@@ -16,15 +16,31 @@ const regionalCosts = {
     "RAO": { name: "Ribeirão Preto", bus: 45, company: "Uber/Local" }
 };
 
-// FUNÇÃO DETETIVE BLINDADA E EM INGLÊS
+// NOVO: Dicionário Tradutor (O Segredo do MVP)
+// Ele converte a sigla para o nome da cidade em inglês para a API não bugar
+const dicionarioCidades = {
+    "GRU": "Sao Paulo",
+    "VCP": "Campinas",
+    "RAO": "Ribeirao Preto",
+    "PRG": "Prague",
+    "CDG": "Paris",
+    "JFK": "New York",
+    "MIA": "Miami",
+    "EZE": "Buenos Aires"
+};
+
+// FUNÇÃO DETETIVE BLINDADA
 async function getAirportDetails(iata, apiKey) {
+    // Se a sigla estiver no dicionário, traduz. Se não, usa a sigla mesmo (fallback).
+    const termoBusca = dicionarioCidades[iata.toUpperCase()] || iata;
+
     const options = {
         method: 'GET',
         url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchAirport',
         params: { 
-            query: iata,
-            market: 'US',    // Voltamos para US para não bugar a API gratuita
-            locale: 'en-US'  // Voltamos para Inglês
+            query: termoBusca, // Agora o servidor pesquisa "Sao Paulo" ao invés de "GRU"
+            market: 'US',    
+            locale: 'en-US'  
         },
         headers: {
             'X-RapidAPI-Key': apiKey,
@@ -36,20 +52,21 @@ async function getAirportDetails(iata, apiKey) {
         const response = await axios.request(options);
         const data = response.data.data;
         
-        // Super Log para vermos o que a API está devolvendo de verdade
-        console.log(`Resposta do Detetive para ${iata}:`, JSON.stringify(data).substring(0, 150) + "...");
+        console.log(`Resposta Detetive para '${termoBusca}':`, JSON.stringify(data).substring(0, 100) + "...");
         
         if (!data || data.length === 0) {
-            throw new Error(`Skyscanner retornou vazio para a sigla: ${iata}`);
+            throw new Error(`A API não achou nenhuma cidade para: ${termoBusca}`);
         }
         
+        // Retorna o código secreto da cidade/aeroporto
         return {
             skyId: data[0].skyId || data[0].navigation?.relevantFlightParams?.skyId,
             entityId: data[0].entityId || data[0].navigation?.relevantFlightParams?.entityId
         };
     } catch (err) {
-        console.error(`Erro ao traduzir o aeroporto ${iata}:`, err.message);
-        throw new Error(`Falha ao buscar código do aeroporto ${iata}`);
+        console.error(`Erro no Detetive:`, err.message);
+        // Devolvemos um erro claro para a tela do usuário
+        throw new Error(`Não foi possível achar o destino. Tente escrever o NOME DA CIDADE (ex: Prague) ao invés da sigla.`);
     }
 }
 
@@ -62,13 +79,13 @@ app.get('/api/buscar', async (req, res) => {
     }
 
     try {
-        console.log(`Buscando códigos secretos para ${origemId} e ${destinoId}...`);
+        console.log(`Iniciando busca: ${origemId} -> ${destinoId}...`);
         
-        // Passo 1: Pega os IDs numéricos (agora pesquisando em US)
+        // Passo 1: O Detetive traduz a cidade e pega os IDs numéricos
         const originInfo = await getAirportDetails(origemId, apiKey);
         const destInfo = await getAirportDetails(destinoId, apiKey);
 
-        // Passo 2: Busca os voos reais (Mantemos BRL para o preço vir em Reais)
+        // Passo 2: Busca os voos reais (Preços em Reais)
         const options = {
             method: 'GET',
             url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
@@ -98,7 +115,7 @@ app.get('/api/buscar', async (req, res) => {
 
         const processed = flights.slice(0, 5).map(f => {
             const aero = origemId; 
-            const logistica = regionalCosts[aero] || { bus: 0, company: "Indefinido" };
+            const logistica = regionalCosts[aero] || { bus: 0, company: "Bus Local" };
             const flightPrice = Math.round(f?.price?.raw || f?.price || 0);
             const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || f?.legs?.[0]?.carriers?.[0]?.name || "Cia Aérea";
 
