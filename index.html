@@ -9,15 +9,15 @@
         .header { text-align: center; color: #0052cc; margin-bottom: 30px; }
         .search-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         label { display: block; font-size: 11px; font-weight: bold; color: #6b778c; text-transform: uppercase; margin-bottom: 5px; }
-        input, select { width: 100%; padding: 12px; border: 2px solid #dfe1e6; border-radius: 10px; font-size: 15px; }
+        input, select { width: 100%; padding: 12px; border: 2px solid #dfe1e6; border-radius: 10px; font-size: 15px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; background: #ff8b00; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
         button:hover { background: #e67e00; }
         .card { border: 1px solid #e2e8f0; padding: 20px; border-radius: 15px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; background: white; transition: 0.3s; }
         .card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .total-price { font-size: 28px; font-weight: 800; color: #172b4d; }
         #loader { text-align: center; margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: 600; }
-        .status-info { color: #0052cc; background: #e6f0ff; }
-        .status-error { color: #d32f2f; background: #ffebee; }
+        .status-info { color: #0052cc; background: #e6f0ff; border: 1px solid #b3d4ff; }
+        .status-error { color: #d32f2f; background: #ffebee; border: 1px solid #ffcdd2; }
     </style>
 </head>
 <body>
@@ -39,7 +39,7 @@
         </div>
         <div>
             <label>Ir para (IATA)</label>
-            <input type="text" id="destino" value="PRG">
+            <input type="text" id="destino" value="PRG" placeholder="Ex: PRG, CDG, JFK">
         </div>
         <div>
             <label>Data</label>
@@ -49,14 +49,14 @@
 
     <button onclick="buscar()">BUSCAR AGORA</button>
 
-    <div id="loader" style="display:none;">🔎 Consultando Skyscanner...</div>
+    <div id="loader" style="display:none;"></div>
     <div id="resultados"></div>
 </div>
 
 <script>
     async function buscar() {
         const o = document.getElementById('origem').value;
-        const d = document.getElementById('destino').value;
+        const d = document.getElementById('destino').value.toUpperCase();
         const dt = document.getElementById('data').value;
         const resDiv = document.getElementById('resultados');
         const loader = document.getElementById('loader');
@@ -64,8 +64,14 @@
         // Reset visual
         loader.className = "status-info";
         loader.style.display = "block";
-        loader.innerText = "🔎 Acordando o servidor e buscando preços reais (isso pode levar 30s)...";
+        loader.innerText = "🔎 Acordando o servidor e buscando preços reais (isso pode levar uns segundos)...";
         resDiv.innerHTML = "";
+
+        if (!d || !dt) {
+            loader.className = "status-error";
+            loader.innerText = "❌ Por favor, preencha o destino e a data.";
+            return;
+        }
 
         try {
             // CONEXÃO COM SEU SERVIDOR NO RENDER
@@ -73,14 +79,18 @@
             
             const response = await fetch(url);
             
-            if (!response.ok) throw new Error("Erro na resposta do servidor");
+            // Verificação rigorosa de erros
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Erro desconhecido do servidor");
+            }
             
             const dados = await response.json();
 
             loader.style.display = "none";
             
             if (dados.length === 0) {
-                resDiv.innerHTML = "<p style='text-align:center; padding:20px;'>Nenhum voo encontrado para esta data.</p>";
+                resDiv.innerHTML = "<p style='text-align:center; padding:20px; color:#6b778c;'>Nenhum voo encontrado para esta rota nesta data.</p>";
                 return;
             }
 
@@ -95,7 +105,7 @@
                             </div>
                         </div>
                         <div style="text-align:right">
-                            <div style="font-size:10px; font-weight:bold; color:#94a3b8;">CUSTO TOTAL</div>
+                            <div style="font-size:10px; font-weight:bold; color:#94a3b8;">CUSTO TOTAL APROXIMADO</div>
                             <div class="total-price">R$ ${v.total.toLocaleString('pt-BR')}</div>
                         </div>
                     </div>
@@ -103,7 +113,7 @@
             });
         } catch (err) {
             loader.className = "status-error";
-            loader.innerText = "❌ Servidor fora do ar ou ainda carregando. Tente novamente em 30 segundos.";
+            loader.innerText = `❌ Falha na busca: ${err.message}. Tente novamente.`;
             console.error(err);
         }
     }
