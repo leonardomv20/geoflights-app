@@ -18,12 +18,16 @@ const regionalCosts = {
     "RAO": { name: "Ribeirão Preto", bus: 45, company: "Uber/Local" }
 };
 
-// FUNÇÃO DETETIVE: Traduz "GRU" e "PRG" para os códigos secretos do Skyscanner
+// FUNÇÃO DETETIVE (Agora com os parâmetros obrigatórios)
 async function getAirportDetails(iata, apiKey) {
     const options = {
         method: 'GET',
         url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchAirport',
-        params: { query: iata },
+        params: { 
+            query: iata,
+            market: 'BR',    // Correção: Informando o mercado
+            locale: 'pt-BR'  // Correção: Informando o idioma
+        },
         headers: {
             'X-RapidAPI-Key': apiKey,
             'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
@@ -34,10 +38,9 @@ async function getAirportDetails(iata, apiKey) {
     const data = response.data.data;
     
     if (!data || data.length === 0) {
-        throw new Error(`Aeroporto não encontrado para a sigla: ${iata}`);
+        throw new Error(`Skyscanner não reconheceu a sigla: ${iata}. Tente outra origem como GRU.`);
     }
     
-    // Pega o skyId e entityId (tentando em dois lugares diferentes do JSON para garantir)
     return {
         skyId: data[0].skyId || data[0].navigation?.relevantFlightParams?.skyId,
         entityId: data[0].entityId || data[0].navigation?.relevantFlightParams?.entityId
@@ -53,12 +56,13 @@ app.get('/api/buscar', async (req, res) => {
     }
 
     try {
-        // PASSO 1: O Duplo Salto (Traduzindo Origem e Destino)
         console.log(`Buscando códigos secretos para ${origemId} e ${destinoId}...`);
+        
+        // Passo 1: Pega os IDs numéricos
         const originInfo = await getAirportDetails(origemId, apiKey);
         const destInfo = await getAirportDetails(destinoId, apiKey);
 
-        // PASSO 2: A Busca Real com os Códigos Secretos
+        // Passo 2: Busca os voos reais
         const options = {
             method: 'GET',
             url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
@@ -82,15 +86,15 @@ app.get('/api/buscar', async (req, res) => {
 
         const response = await axios.request(options);
         
-        console.log("Sucesso na busca! Processando preços...");
+        console.log("Sucesso na busca de voos! Processando...");
         
         const flights = response.data.data?.itineraries || response.data.data?.flights || response.data.data || response.data.itineraries || [];
 
         const processed = flights.slice(0, 5).map(f => {
-            const aero = origemId; // Mantemos a sigla amigável para o front-end
+            const aero = origemId; 
             const logistica = regionalCosts[aero] || { bus: 0, company: "Indefinido" };
             const flightPrice = Math.round(f?.price?.raw || f?.price || 0);
-            const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || f?.legs?.[0]?.carriers?.[0]?.name || "Cia Aérea Desconhecida";
+            const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || f?.legs?.[0]?.carriers?.[0]?.name || "Cia Aérea";
 
             return {
                 aero: aero,
