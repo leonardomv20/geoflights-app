@@ -4,7 +4,7 @@ const cors = require('cors');
 
 const app = express();
 
-// Proteção: Apenas o seu site pode usar este servidor, evitando que outros gastem sua cota do RapidAPI
+// Proteção: Apenas o seu site pode usar este servidor
 const corsOptions = {
     origin: ['https://leonardomv20.github.io', 'http://localhost:3000'],
     optionsSuccessStatus: 200
@@ -28,18 +28,20 @@ app.get('/api/buscar', async (req, res) => {
 
     const options = {
         method: 'GET',
-        url: 'https://skyscanner-flights-travel.p.rapidapi.com/v1/flights/search-one-way',
+        // CORREÇÃO APLICADA AQUI (-api adicionado):
+        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/v1/flights/search-one-way',
         params: { 
             fromEntityId: origemId, 
             toEntityId: destinoId, 
             departDate: data,
-            currency: 'BRL', // Força o preço em Reais
-            market: 'BR',    // Mercado brasileiro
-            locale: 'pt-BR'  // Idioma português
+            currency: 'BRL',
+            market: 'BR',
+            locale: 'pt-BR'
         },
         headers: {
             'X-RapidAPI-Key': apiKey,
-            'X-RapidAPI-Host': 'skyscanner-flights-travel.p.rapidapi.com'
+            // CORREÇÃO APLICADA AQUI TAMBÉM (-api adicionado):
+            'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
         }
     };
 
@@ -48,7 +50,6 @@ app.get('/api/buscar', async (req, res) => {
         const flights = response.data.data || [];
 
         const processed = flights.slice(0, 5).map(f => {
-            // "Optional Chaining" (?.) - Impede o app de quebrar se o Skyscanner não mandar algum dado
             const aero = f?.legs?.[0]?.origin?.displayCode || origemId;
             const logistica = regionalCosts[aero] || { bus: 0, company: "Indefinido" };
             const flightPrice = Math.round(f?.price?.raw || 0);
