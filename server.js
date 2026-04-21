@@ -18,45 +18,76 @@ const regionalCosts = {
     "RAO": { name: "Ribeirão Preto", bus: 45, company: "Uber/Local" }
 };
 
-app.get('/api/buscar', async (req, res) => {
-    const { origemId, destinoId, data } = req.query;
-    const apiKey = process.env.RAPIDAPI_KEY; 
-
-    if (!origemId || !destinoId || !data) {
-        return res.status(400).json({ error: "Parâmetros incompletos. Necessário origemId, destinoId e data." });
-    }
-
-    // Código EXATO construído a partir do snippet da RapidAPI
+// FUNÇÃO DETETIVE: Traduz "GRU" e "PRG" para os códigos secretos do Skyscanner
+async function getAirportDetails(iata, apiKey) {
     const options = {
         method: 'GET',
-        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
-        params: { 
-            originSkyId: origemId,      // Usando o código IATA (Ex: GRU)
-            destinationSkyId: destinoId, // Usando o código IATA (Ex: PRG)
-            date: data,                 // Nova nomenclatura de data
-            adults: '1',                // A API exige saber quantos adultos
-            cabinClass: 'economy',
-            currency: 'BRL',
-            market: 'BR',
-            countryCode: 'BR'
-        },
+        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchAirport',
+        params: { query: iata },
         headers: {
             'X-RapidAPI-Key': apiKey,
             'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
         }
     };
+    
+    const response = await axios.request(options);
+    const data = response.data.data;
+    
+    if (!data || data.length === 0) {
+        throw new Error(`Aeroporto não encontrado para a sigla: ${iata}`);
+    }
+    
+    // Pega o skyId e entityId (tentando em dois lugares diferentes do JSON para garantir)
+    return {
+        skyId: data[0].skyId || data[0].navigation?.relevantFlightParams?.skyId,
+        entityId: data[0].entityId || data[0].navigation?.relevantFlightParams?.entityId
+    };
+}
+
+app.get('/api/buscar', async (req, res) => {
+    const { origemId, destinoId, data } = req.query;
+    const apiKey = process.env.RAPIDAPI_KEY; 
+
+    if (!origemId || !destinoId || !data) {
+        return res.status(400).json({ error: "Parâmetros incompletos." });
+    }
 
     try {
+        // PASSO 1: O Duplo Salto (Traduzindo Origem e Destino)
+        console.log(`Buscando códigos secretos para ${origemId} e ${destinoId}...`);
+        const originInfo = await getAirportDetails(origemId, apiKey);
+        const destInfo = await getAirportDetails(destinoId, apiKey);
+
+        // PASSO 2: A Busca Real com os Códigos Secretos
+        const options = {
+            method: 'GET',
+            url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
+            params: { 
+                originSkyId: originInfo.skyId,      
+                originEntityId: originInfo.entityId, 
+                destinationSkyId: destInfo.skyId, 
+                destinationEntityId: destInfo.entityId,
+                date: data,                 
+                adults: '1',                
+                cabinClass: 'economy',
+                currency: 'BRL',
+                market: 'BR',
+                countryCode: 'BR'
+            },
+            headers: {
+                'X-RapidAPI-Key': apiKey,
+                'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
+            }
+        };
+
         const response = await axios.request(options);
         
-        // Mantemos o Log para garantir a estrutura
-        console.log("Sucesso na API! Estrutura recebida:", JSON.stringify(response.data).substring(0, 300) + "...");
+        console.log("Sucesso na busca! Processando preços...");
         
-        // Extrai os voos da estrutura de dados da API
         const flights = response.data.data?.itineraries || response.data.data?.flights || response.data.data || response.data.itineraries || [];
 
         const processed = flights.slice(0, 5).map(f => {
-            const aero = f?.legs?.[0]?.origin?.displayCode || f?.legs?.[0]?.origin?.id || origemId;
+            const aero = origemId; // Mantemos a sigla amigável para o front-end
             const logistica = regionalCosts[aero] || { bus: 0, company: "Indefinido" };
             const flightPrice = Math.round(f?.price?.raw || f?.price || 0);
             const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || f?.legs?.[0]?.carriers?.[0]?.name || "Cia Aérea Desconhecida";
@@ -73,8 +104,8 @@ app.get('/api/buscar', async (req, res) => {
 
         res.json(processed);
     } catch (error) {
-        console.error("Erro na API:", error.response?.data || error.message);
-        res.status(500).json({ error: "Erro ao consultar a malha aérea." });
+        console.error("Erro no Servidor:", error.response?.data || error.message);
+        res.status(500).json({ error: error.message || "Erro ao consultar a malha aérea." });
     }
 });
 
