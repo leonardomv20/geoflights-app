@@ -28,8 +28,8 @@ app.get('/api/buscar', async (req, res) => {
 
     const options = {
         method: 'GET',
-        // CORREÇÃO APLICADA: Rota oficial de busca de voos sem o /v1/
-        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
+        // CORREÇÃO: Endereço exato do seu print (sky-scanner3)
+        url: 'https://sky-scanner3.p.rapidapi.com/flights/search-flights',
         params: { 
             fromEntityId: origemId, 
             toEntityId: destinoId, 
@@ -40,22 +40,25 @@ app.get('/api/buscar', async (req, res) => {
         },
         headers: {
             'X-RapidAPI-Key': apiKey,
-            'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
+            // CORREÇÃO: Host exato do seu print
+            'X-RapidAPI-Host': 'sky-scanner3.p.rapidapi.com'
         }
     };
 
     try {
         const response = await axios.request(options);
         
-        // LOG DE DEBUG: Mostra no Render um pedaço da resposta para vermos a estrutura caso não ache os voos na tela
+        // Mantemos o Log de sucesso caso a estrutura do JSON seja diferente
         console.log("Sucesso na API! Estrutura recebida:", JSON.stringify(response.data).substring(0, 300) + "...");
         
-        const flights = response.data.data || response.data.itineraries || [];
+        // Mapeamento inteligente que tenta buscar a lista de voos dependendo de como a API devolve
+        const flights = response.data.data?.itineraries || response.data.data?.flights || response.data.data || response.data.itineraries || [];
 
         const processed = flights.slice(0, 5).map(f => {
             const aero = f?.legs?.[0]?.origin?.displayCode || origemId;
             const logistica = regionalCosts[aero] || { bus: 0, company: "Indefinido" };
-            const flightPrice = Math.round(f?.price?.raw || 0);
+            // Essa API pode devolver o preço em f.price.raw ou apenas f.price
+            const flightPrice = Math.round(f?.price?.raw || f?.price || 0);
             const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || "Cia Aérea Desconhecida";
 
             return {
