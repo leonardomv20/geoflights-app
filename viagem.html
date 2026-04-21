@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>GeoFlights Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f5f7; padding: 20px; color: #172b4d; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header { text-align: center; color: #0052cc; margin-bottom: 30px; }
+        .search-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        label { display: block; font-size: 11px; font-weight: bold; color: #6b778c; text-transform: uppercase; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 12px; border: 2px solid #dfe1e6; border-radius: 10px; font-size: 15px; }
+        button { width: 100%; padding: 15px; background: #ff8b00; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #e67e00; }
+        .card { border: 1px solid #e2e8f0; padding: 20px; border-radius: 15px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .total-price { font-size: 28px; font-weight: 800; color: #172b4d; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>GeoFlights 🌍</h1>
+        <p>Busca Real & Inteligente</p>
+    </div>
+
+    <div class="search-grid">
+        <div>
+            <label>Sair de</label>
+            <select id="origem">
+                <option value="RAO">Ribeirão Preto (RAO)</option>
+                <option value="GRU">Guarulhos (GRU)</option>
+                <option value="VCP">Campinas (VCP)</option>
+            </select>
+        </div>
+        <div>
+            <label>Ir para (IATA)</label>
+            <input type="text" id="destino" value="PRG">
+        </div>
+        <div>
+            <label>Data</label>
+            <input type="date" id="data" value="2026-08-20">
+        </div>
+    </div>
+
+    <button onclick="buscar()">BUSCAR AGORA</button>
+
+    <div id="loader" style="display:none; text-align:center; margin-top:20px;">🔎 Consultando preços reais...</div>
+    <div id="resultados"></div>
+</div>
+
+<script>
+    async function buscar() {
+        const o = document.getElementById('origem').value;
+        const d = document.getElementById('destino').value;
+        const dt = document.getElementById('data').value;
+        const resDiv = document.getElementById('resultados');
+        const loader = document.getElementById('loader');
+
+        loader.style.display = "block";
+        resDiv.innerHTML = "";
+
+        try {
+            // No Passo 2, vamos trocar esse link pelo do seu servidor online
+            const response = await fetch(`http://localhost:3000/api/buscar?origemId=${o}&destinoId=${d}&data=${dt}`);
+            const dados = await response.json();
+
+            loader.style.display = "none";
+            dados.forEach(v => {
+                resDiv.innerHTML += `
+                    <div class="card">
+                        <div>
+                            <strong style="color:#0052cc; font-size:18px;">Via ${v.aero} (${v.cia})</strong>
+                            <div style="font-size:14px; color:#64748b; margin-top:8px;">
+                                🚌 ${v.transporte}: R$ ${v.custoBus}<br>
+                                ✈️ Voo: R$ ${v.precoVoo}
+                            </div>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:10px; font-weight:bold; color:#94a3b8;">CUSTO TOTAL</div>
+                            <div class="total-price">R$ ${v.total.toLocaleString('pt-BR')}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        } catch (err) {
+            loader.innerText = "❌ Servidor ainda não conectado.";
+        }
+    }
+</script>
+
+</body>
+</html>
