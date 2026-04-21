@@ -28,8 +28,8 @@ app.get('/api/buscar', async (req, res) => {
 
     const options = {
         method: 'GET',
-        // CORREÇÃO APLICADA AQUI (-api adicionado):
-        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/v1/flights/search-one-way',
+        // CORREÇÃO APLICADA: Rota oficial de busca de voos sem o /v1/
+        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
         params: { 
             fromEntityId: origemId, 
             toEntityId: destinoId, 
@@ -40,14 +40,17 @@ app.get('/api/buscar', async (req, res) => {
         },
         headers: {
             'X-RapidAPI-Key': apiKey,
-            // CORREÇÃO APLICADA AQUI TAMBÉM (-api adicionado):
             'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
         }
     };
 
     try {
         const response = await axios.request(options);
-        const flights = response.data.data || [];
+        
+        // LOG DE DEBUG: Mostra no Render um pedaço da resposta para vermos a estrutura caso não ache os voos na tela
+        console.log("Sucesso na API! Estrutura recebida:", JSON.stringify(response.data).substring(0, 300) + "...");
+        
+        const flights = response.data.data || response.data.itineraries || [];
 
         const processed = flights.slice(0, 5).map(f => {
             const aero = f?.legs?.[0]?.origin?.displayCode || origemId;
