@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>GeoFlights Pro</title>
+    <title>GeoFlights Pro | Busca Real Online</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f5f7; padding: 20px; color: #172b4d; }
         .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
@@ -12,8 +12,12 @@
         input, select { width: 100%; padding: 12px; border: 2px solid #dfe1e6; border-radius: 10px; font-size: 15px; }
         button { width: 100%; padding: 15px; background: #ff8b00; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
         button:hover { background: #e67e00; }
-        .card { border: 1px solid #e2e8f0; padding: 20px; border-radius: 15px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .card { border: 1px solid #e2e8f0; padding: 20px; border-radius: 15px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; background: white; transition: 0.3s; }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .total-price { font-size: 28px; font-weight: 800; color: #172b4d; }
+        #loader { text-align: center; margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: 600; }
+        .status-info { color: #0052cc; background: #e6f0ff; }
+        .status-error { color: #d32f2f; background: #ffebee; }
     </style>
 </head>
 <body>
@@ -21,7 +25,7 @@
 <div class="container">
     <div class="header">
         <h1>GeoFlights 🌍</h1>
-        <p>Busca Real & Inteligente</p>
+        <p>Busca Real & Inteligente (Online)</p>
     </div>
 
     <div class="search-grid">
@@ -45,7 +49,7 @@
 
     <button onclick="buscar()">BUSCAR AGORA</button>
 
-    <div id="loader" style="display:none; text-align:center; margin-top:20px;">🔎 Consultando preços reais...</div>
+    <div id="loader" style="display:none;">🔎 Consultando Skyscanner...</div>
     <div id="resultados"></div>
 </div>
 
@@ -57,15 +61,29 @@
         const resDiv = document.getElementById('resultados');
         const loader = document.getElementById('loader');
 
+        // Reset visual
+        loader.className = "status-info";
         loader.style.display = "block";
+        loader.innerText = "🔎 Acordando o servidor e buscando preços reais (isso pode levar 30s)...";
         resDiv.innerHTML = "";
 
         try {
-            // No Passo 2, vamos trocar esse link pelo do seu servidor online
-            const response = await fetch(`http://localhost:3000/api/buscar?origemId=${o}&destinoId=${d}&data=${dt}`);
+            // CONEXÃO COM SEU SERVIDOR NO RENDER
+            const url = `https://geoflights-backend.onrender.com/api/buscar?origemId=${o}&destinoId=${d}&data=${dt}`;
+            
+            const response = await fetch(url);
+            
+            if (!response.ok) throw new Error("Erro na resposta do servidor");
+            
             const dados = await response.json();
 
             loader.style.display = "none";
+            
+            if (dados.length === 0) {
+                resDiv.innerHTML = "<p style='text-align:center; padding:20px;'>Nenhum voo encontrado para esta data.</p>";
+                return;
+            }
+
             dados.forEach(v => {
                 resDiv.innerHTML += `
                     <div class="card">
@@ -84,7 +102,9 @@
                 `;
             });
         } catch (err) {
-            loader.innerText = "❌ Servidor ainda não conectado.";
+            loader.className = "status-error";
+            loader.innerText = "❌ Servidor fora do ar ou ainda carregando. Tente novamente em 30 segundos.";
+            console.error(err);
         }
     }
 </script>
