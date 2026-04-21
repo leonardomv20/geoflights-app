@@ -23,43 +23,37 @@ app.get('/api/buscar', async (req, res) => {
     const apiKey = process.env.RAPIDAPI_KEY; 
 
     if (!origemId || !destinoId || !data) {
-        return res.status(400).json({ error: "Parâmetros incompletos. Necessário origemId, destinoId e data." });
+        return res.status(400).json({ error: "Parâmetros incompletos." });
     }
 
-    // Código EXATO construído a partir do snippet da RapidAPI
+    // Código EXATO baseado no seu último print oficial da API
     const options = {
         method: 'GET',
-        url: 'https://skyscanner-flights-travel-api.p.rapidapi.com/flights/searchFlights',
+        url: 'https://skyscanner-flights-travel.p.rapidapi.com/v1/flights/search-one-way',
         params: { 
-            originSkyId: origemId,      // Usando o código IATA (Ex: GRU)
-            destinationSkyId: destinoId, // Usando o código IATA (Ex: PRG)
-            date: data,                 // Nova nomenclatura de data
-            adults: '1',                // A API exige saber quantos adultos
-            cabinClass: 'economy',
-            currency: 'BRL',
-            market: 'BR',
-            countryCode: 'BR'
+            fromEntityId: origemId, 
+            toEntityId: destinoId, 
+            departDate: data
         },
         headers: {
             'X-RapidAPI-Key': apiKey,
-            'X-RapidAPI-Host': 'skyscanner-flights-travel-api.p.rapidapi.com'
+            'X-RapidAPI-Host': 'skyscanner-flights-travel.p.rapidapi.com'
         }
     };
 
     try {
         const response = await axios.request(options);
         
-        // Mantemos o Log para garantir a estrutura
+        // Log de segurança: se a API responder diferente, nós veremos aqui
         console.log("Sucesso na API! Estrutura recebida:", JSON.stringify(response.data).substring(0, 300) + "...");
         
-        // Extrai os voos da estrutura de dados da API
-        const flights = response.data.data?.itineraries || response.data.data?.flights || response.data.data || response.data.itineraries || [];
+        const flights = response.data.data || [];
 
         const processed = flights.slice(0, 5).map(f => {
             const aero = f?.legs?.[0]?.origin?.displayCode || f?.legs?.[0]?.origin?.id || origemId;
             const logistica = regionalCosts[aero] || { bus: 0, company: "Indefinido" };
             const flightPrice = Math.round(f?.price?.raw || f?.price || 0);
-            const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || f?.legs?.[0]?.carriers?.[0]?.name || "Cia Aérea Desconhecida";
+            const carrier = f?.legs?.[0]?.carriers?.marketing?.[0]?.name || "Cia Aérea Desconhecida";
 
             return {
                 aero: aero,
